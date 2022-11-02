@@ -1,0 +1,14 @@
+# Webserver/wsgi
+gunicorn
+meinheld
+json-logging
+
+# Flask & plugins
+Flask
+flask-cors
+flask-sqlalchemy
+
+# General dependencies
+requests
+python-dotenv
+pydantic

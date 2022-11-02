@@ -1,0 +1,9 @@
+[flake8]
+ignore =
+    # Ignore Line-too-long
+    E501,
+    # Ignore newline-before-operator (it's this or W504)
+    W503
+exclude =
+    .git,
+    venv,

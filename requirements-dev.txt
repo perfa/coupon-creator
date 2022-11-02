@@ -1,0 +1,19 @@
+# All the production requirements are needed for the dev
+-r ./requirements.txt
+
+# Hygiene
+autopep8
+flake8
+flake8-blind-except
+flake8-isort
+flake8-quotes
+pycln
+isort
+pep8-naming
+pylint
+pylint-flask
+rope
+
+# Testing
+pytest
+pytest-cov
