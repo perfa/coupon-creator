@@ -8,15 +8,18 @@ services:
     environment:
       APP_ENVIRONMENT: development
       FLASK_APP: app/application.py
+      EMAIL_VERIFIER_URL: http://mock_email_verifier:5000
+      COUPON_REALIZER_URL: http://mock_coupon_realizer:5000
     depends_on:
-      - mock_woocommerce
+      - mock_email_verifier
+      - mock_coupon_realizer
     volumes:
       - .:/app
     working_dir: /app
     ports:
       - 5000:5000
 
-  mock_woocommerce:
+  mock_email_verifier:
     build:
       context: ./
       dockerfile: Dockerfile.mock_upstream
@@ -26,5 +29,14 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    ports:
-      - 5001:5000
+
+  mock_coupon_realizer:
+    build:
+      context: ./
+      dockerfile: Dockerfile.mock_upstream
+    environment:
+      APP_ENVIRONMENT: development
+      FLASK_APP: tests/mock_upstream.py
+    volumes:
+      - .:/app
+    working_dir: /app

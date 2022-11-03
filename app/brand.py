@@ -1,50 +1,31 @@
-import datetime
 import logging
+import os
 import sys
-from enum import Enum, auto
 from functools import wraps
 from http import HTTPStatus
-from typing import Callable, Optional
+from typing import Callable
+from uuid import uuid4
 
+import requests
 from flask import Blueprint, Response, abort, jsonify, request
-from pydantic import BaseModel
 from pydantic.error_wrappers import ValidationError
+from pyisemail import is_email
+from requests.exceptions import HTTPError
 
 import models
+from app.data_types import Coupon, DiscountDescription, FanData
 
 blueprint = Blueprint('brands', __name__)
 LOG = logging.getLogger(__name__)
 LOG.addHandler(logging.StreamHandler(sys.stdout))
 LOG.propagate = False
+EMAIL_VERIFIER = os.getenv('EMAIL_VERIFIER_URL', 'http://localhost:5001')
+COUPON_REALIZER = os.getenv('COUPON_REALIZER_URL', 'http://localhost:5002')
 
 
 def id_from_brand(brand: str) -> int:
     """This would normally be part of the loaded brand configuration."""
     return 1234
-
-
-class StrEnum(str, Enum):
-    """Ref: https://docs.python.org/3.9/library/enum.html#using-automatic-values"""
-    def _generate_next_value_(name: str, start, count, last_values) -> str:  # NOQA - ignore bad name for clarity
-        return name
-
-
-class DiscountType(StrEnum):
-    PERCENT = auto()  # A fixed percentage off purchase
-    FIXED_CART = auto()  # A fixed "dollar amount" off purchase
-    # ... and so on
-
-
-class DiscountDescription(BaseModel):
-    name: str
-    fixed_code: Optional[str]
-    date_expires: datetime.date
-    discount_type: DiscountType
-    discount_amount: int
-    description: Optional[str]
-    usage_limit: Optional[int]
-    free_shipping: Optional[bool]
-    verify_email: Optional[bool]
 
 
 def require_auth_header(func: Callable) -> Callable:
@@ -110,4 +91,55 @@ def delete_discount(brand: str, discount_id: int) -> Response:
 @blueprint.post('/<brand>/fans')
 @require_auth_header
 def new_fan(brand: str) -> Response:
-    abort(HTTPStatus.NOT_IMPLEMENTED)
+    LOG.debug(f'Registering fan data for {brand}')
+
+    try:
+        fan_data = FanData(**request.json)
+    except ValidationError:
+        LOG.warning('Bad data in POST request.')
+        abort(HTTPStatus.BAD_REQUEST)
+
+    if not is_email(fan_data.email):
+        LOG.warning('Bad email in POST request.')
+        abort(HTTPStatus.UNPROCESSABLE_ENTITY)
+
+    fan_application = models.FanApplication(**fan_data.dict())
+    fan_application.token = uuid4().hex
+    fan_application.brand_id = id_from_brand(brand)
+
+    discount = models.Discount.match_to_application(fan_application, id_from_brand(brand))
+    if discount is None:
+        LOG.warning('No Discount matches POST request.')
+        abort(HTTPStatus.UNPROCESSABLE_ENTITY)
+
+    fan_application.discount_id = discount.id
+
+    if discount.verify_email:
+        verification_body = {
+            'email': fan_application.email,
+            'token': fan_application.token,
+            'brand': fan_application.brand_id,
+        }
+
+        try:
+            r = requests.post(EMAIL_VERIFIER + '/email', json=verification_body)
+            r.raise_for_status()
+        except HTTPError:
+            LOG.warning('Failed to queue email verification.')
+            abort(HTTPStatus.SERVICE_UNAVAILABLE)
+
+        # We've handed off the token, let's save it.
+        # Save before or after the POST is an interesting discussion.
+        fan_application.save()
+        return 'OK'
+
+    # No verification, simply create a coupon code directly
+    coupon = Coupon.from_data(fan_application, discount)
+    try:
+        r = requests.post(COUPON_REALIZER + '/coupon', json=coupon.dict())
+        r.raise_for_status()
+    except HTTPError:
+        LOG.warning('Failed to queue realization of coupon code.')
+        abort(HTTPStatus.SERVICE_UNAVAILABLE)
+
+    return 'OK'

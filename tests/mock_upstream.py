@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-import logging
+import json
 import os
 import sys
 
 import flask
-import json_logging
 from dotenv import load_dotenv
+from flask import request
 
 # Load and check env vars
 load_dotenv()
@@ -17,22 +17,17 @@ if not SERVER_ENV:
 # Create Flask app
 app = flask.Flask(__name__)
 
-# Logging
-logging.getLogger('werkzeug').setLevel(logging.ERROR)  # Set flask's req/resp logging to ERROR level
-if SERVER_ENV == 'production':
-    json_logging.init_flask(enable_json=True)
-    json_logging.init_request_instrument(app)
-
-LOG = logging.getLogger(__name__)
-LOG.addHandler(logging.StreamHandler(sys.stdout))
-LOG.propagate = False  # Avoid double-printing
-
 
 @app.route('/<path:path>', methods=['POST', 'GET'])
 def endpoint(path='') -> str:
+    print(request.method, path)
+    if request.is_json:
+        print(json.dumps(request.json, indent=2))
+    else:
+        print(request.data)
     return 'OK'
 
 
 if __name__ == '__main__':
-    LOG.info('application reloaded')
+    print('application reloaded')
     app.run(host='0.0.0.0')

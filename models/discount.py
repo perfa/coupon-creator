@@ -1,6 +1,9 @@
+import datetime
+
 from sqlalchemy.sql import func
 
 from .db import db
+from .fan import FanApplication
 
 
 class Discount(db.Model):
@@ -29,3 +32,13 @@ class Discount(db.Model):
     def save(self):
         db.session.add(self)
         db.session.commit()
+
+    @classmethod
+    def from_id(cls, id_: int) -> 'Discount':
+        return db.session.query(Discount).filter(Discount.id == id_).filter(Discount.date_expires > datetime.date.today()).one_or_none()
+
+    @classmethod
+    def match_to_application(cls, fan_application: FanApplication, brand: int) -> 'Discount':
+        """Presumably we might have rulesets matching multiple discounts to
+        various situations, e.g. bigger discounts if you provide more handles/addresses"""
+        return db.session.query(Discount).filter(Discount.brand_id == brand).first()
