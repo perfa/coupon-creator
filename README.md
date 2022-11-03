@@ -11,6 +11,31 @@ FLASK_APP=app.application:app APP_ENVIRONMENT=development flask db upgrade
 
 At this point you can run `docker-compose up` and you can interact with the service on `localhost:5000`. All downstream services are mocked by a simple application that answers on all paths with `OK` and prints the METHOD, url and request body.
 
+This service does create the coupon CODE, but does not intend to interface with all the services that might have such a coupon code registered, e.g. WooCommerce, Shopify, custom solutions or CRMs. This is queued with another service. Likewise, if an email must be verified through a sendout where the user clicks on an activation link, that service is assumed to be provided by an additional service.
+
+API
+===
+
+ - GET /brands
+
+    Return all the discounts registered across all brands (simply for visibility in this sandbox)
+
+- POST /brands/&lt;brand&gt;/discounts
+
+    Create a discount, a configuration for coupon codes either global (the same code for all recipients) or unique and per-user generated. Expected body is `DiscountDescription` in `app.data_types` (&lt;brand&gt; parameter ignored in this sandbox)
+
+- PUT/DELETE /brands/&lt;brand&gt;/discounts/&lt;id&gt;
+
+    Not implemented, but would be.
+
+- POST /brands/&lt;brand&gt;/fans
+
+    Register a "fan" of this band who wants to participate in this loyalty program. Expected body is `FanData` in `app.data_types`. Depending on whether our discount is set to verify email accounts or not, will either queue up a Coupon Code with a realization service (connected to WooCommerce et al based on Brand configuration) or request email validation through an email sendout service - in this case the fan data is stored with the activation token in a temporary table.
+
+- GET /fans/&lt;token&gt;
+
+    The "activation link" from the presumed email verification sendout. Matches our temporary data table and queues a Coupon Code if it is a match.
+
 
 Example Calls (using HTTPie)
 ============================
