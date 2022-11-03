@@ -6,9 +6,11 @@ json-logging
 # Flask & plugins
 Flask
 flask-cors
+Flask-Migrate
 flask-sqlalchemy
 
 # General dependencies
 requests
 python-dotenv
 pydantic
+pyIsEmail

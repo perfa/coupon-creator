@@ -7,7 +7,11 @@ import flask
 import json_logging
 from dotenv import load_dotenv
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+import models
+from app.brand import blueprint as brand_bp
+from app.fan import blueprint as fan_bp
 
 # Load and check env vars
 load_dotenv()
@@ -18,7 +22,9 @@ if not SERVER_ENV:
 
 # Create Flask app
 app = flask.Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), 'database.db')
+app.register_blueprint(brand_bp, url_prefix='/brands')
+app.register_blueprint(fan_bp, url_prefix='/fans')
+
 
 # Logging
 logging.getLogger('werkzeug').setLevel(logging.ERROR)  # Set flask's req/resp logging to ERROR level
@@ -31,12 +37,16 @@ LOG.addHandler(logging.StreamHandler(sys.stdout))
 LOG.propagate = False  # Avoid double-printing
 
 # Initialize Flask plugins, etc
-DB = SQLAlchemy(app)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(os.path.abspath(os.path.dirname(__file__)), '../database.db')
+models.db_root.init_app(app)
+migration = Migrate(app, models.db_root)  # Initialize flask-migrate
 CORS(app)
 
 
 @app.get('/health')
 def health_check() -> str:
+    """Minimal endpoint for ECS/k8s health checks"""
     return 'OK'
 
 

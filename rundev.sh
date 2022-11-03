@@ -3,4 +3,4 @@ export FLASK_DEBUG=1
 export APP_ENVIRONMENT=development
 export FLASK_ENV=development
 
-flask run
+flask --debug run
